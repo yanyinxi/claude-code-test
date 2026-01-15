@@ -5,7 +5,9 @@ Simple Agent - 一个基础的对话Agent
 """
 
 import os
+import sys
 import json
+import ssl
 import urllib.request
 import urllib.error
 
@@ -47,7 +49,12 @@ class SimpleAgent:
                 method="POST"
             )
 
-            with urllib.request.urlopen(req, timeout=60) as response:
+            # 创建不验证SSL证书的上下文（仅用于测试）
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+            with urllib.request.urlopen(req, timeout=60, context=ssl_context) as response:
                 result = json.loads(response.read().decode("utf-8"))
 
             assistant_message = result["choices"][0]["message"]["content"]
@@ -66,23 +73,31 @@ class SimpleAgent:
         print("对话已重置")
 
 def main():
-    """主函数 - 交互式对话"""
-    print("=" * 50)
-    print("Simple Agent - 简单对话助手")
-    print("=" * 50)
-    print("命令: 'quit' 退出, 'reset' 重置对话")
-    print("-" * 50)
-    
+    """主函数 - 支持交互式对话和命令行参数"""
     try:
         agent = SimpleAgent()
     except ValueError as e:
         print(f"初始化失败: {e}")
         return
-    
+
+    # 命令行参数模式：python simple_agent.py "你的问题"
+    if len(sys.argv) > 1:
+        user_input = " ".join(sys.argv[1:])
+        print(f"你: {user_input}")
+        print(f"\nAgent: {agent.chat(user_input)}")
+        return
+
+    # 交互式模式
+    print("=" * 50)
+    print("Simple Agent - 简单对话助手")
+    print("=" * 50)
+    print("命令: 'quit' 退出, 'reset' 重置对话")
+    print("-" * 50)
+
     while True:
         try:
             user_input = input("\n你: ").strip()
-            
+
             if not user_input:
                 continue
             if user_input.lower() == "quit":
@@ -91,12 +106,12 @@ def main():
             if user_input.lower() == "reset":
                 agent.reset()
                 continue
-            
+
             print("\nAgent: ", end="", flush=True)
             response = agent.chat(user_input)
             print(response)
-            
-        except KeyboardInterrupt:
+
+        except (KeyboardInterrupt, EOFError):
             print("\n\n再见!")
             break
 
